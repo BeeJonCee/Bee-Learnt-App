@@ -334,8 +334,8 @@ export default function AdminReportsPanel() {
                           cx="50%"
                           cy="50%"
                           labelLine={false}
-                          label={(props: { name: string; active: number }) =>
-                            `${props.name}: ${props.active}`
+                          label={({ name, value }: { name: string; value: number }) =>
+                            `${name}: ${value}`
                           }
                           outerRadius={80}
                           fill="#8884d8"
