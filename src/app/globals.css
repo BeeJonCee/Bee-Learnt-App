@@ -1,0 +1,80 @@
+:root {
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
+  margin: 0;
+  font-family:
+    var(--font-body), "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+::selection {
+  background: #ffd600;
+  color: #121212;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+html[data-contrast="high"] body {
+  background-color: #000;
+  color: #fff;
+}
+
+html[data-contrast="high"] .MuiCard-root,
+html[data-contrast="high"] .MuiPaper-root {
+  border-color: #fff;
+}
+
+html[data-contrast="high"] a,
+html[data-contrast="high"] .MuiTypography-root {
+  color: #fff;
+}
+
+.react-calendar {
+  width: 100%;
+  border: none;
+  font-family: inherit;
+}
+
+.react-calendar__navigation button {
+  color: #1f2937;
+  min-width: 36px;
+  background: none;
+  font-weight: 600;
+}
+
+.react-calendar__tile {
+  padding: 8px 6px;
+  border-radius: 8px;
+}
+
+.react-calendar__tile--now {
+  background: rgba(246, 201, 69, 0.25);
+}
+
+.react-calendar__tile--active {
+  background: rgba(91, 192, 235, 0.3);
+  color: #0f172a;
+}
