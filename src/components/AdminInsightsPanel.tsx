@@ -107,7 +107,7 @@ export default function AdminInsightsPanel() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="day" tickFormatter={formatDay} />
                       <YAxis allowDecimals={false} />
-                      <Tooltip labelFormatter={formatDay} />
+                      <Tooltip labelFormatter={(label) => formatDay(label as string)} />
                       <Legend />
                       <Line
                         type="monotone"
@@ -146,7 +146,7 @@ export default function AdminInsightsPanel() {
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis dataKey="day" tickFormatter={formatDay} />
                       <YAxis allowDecimals={false} />
-                      <Tooltip labelFormatter={formatDay} />
+                      <Tooltip labelFormatter={(label) => formatDay(label as string)} />
                       <Legend />
                       <Bar dataKey="present" stackId="a" fill="#5bc0eb" />
                       <Bar dataKey="absent" stackId="a" fill="#ef5350" />
