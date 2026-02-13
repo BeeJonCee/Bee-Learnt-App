@@ -71,10 +71,9 @@ export default function LoginPageContent() {
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Invalid email or password.";
-      console.error("[auth-ui] login:submit:error", {
-        email: maskEmail(email),
-        message,
-      });
+      console.error(
+        `[auth-ui] login:submit:error email=${maskEmail(email)} message=${message}`,
+      );
       setError(message);
     } finally {
       setLoading(false);

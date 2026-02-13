@@ -78,12 +78,11 @@ export default function RegisterPage() {
         );
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Registration failed.";
-      console.error("[auth-ui] register:submit:error", {
-        email: maskEmail(form.email),
-        role: form.role,
-        message,
-      });
+      const message =
+        err instanceof Error ? err.message : "Registration failed.";
+      console.error(
+        `[auth-ui] register:submit:error email=${maskEmail(form.email)} role=${form.role} message=${message}`,
+      );
       setError(message);
     } finally {
       setLoading(false);

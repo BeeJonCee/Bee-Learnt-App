@@ -1,7 +1,6 @@
 "use client";
 
 import AccessibilityNewIcon from "@mui/icons-material/AccessibilityNew";
-import AdminPanelSettingsIcon from "@mui/icons-material/AdminPanelSettings";
 import AssignmentTurnedInIcon from "@mui/icons-material/AssignmentTurnedIn";
 import AutoAwesomeIcon from "@mui/icons-material/AutoAwesome";
 import Brightness4Icon from "@mui/icons-material/Brightness4";
@@ -149,12 +148,6 @@ export default function AppShell({ children }: { children: ReactNode }) {
         icon: GroupIcon,
         visible: role === "PARENT",
       },
-      {
-        label: "Admin",
-        href: "/admin",
-        icon: AdminPanelSettingsIcon,
-        visible: role === "ADMIN",
-      },
     ];
   }, [user?.role]);
 
@@ -201,7 +194,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
               pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <ListItemButton
-                key={item.href}
+                key={`${item.href}:${item.label}`}
                 component={Link}
                 href={item.href}
                 selected={selected}

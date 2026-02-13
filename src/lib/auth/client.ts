@@ -2,14 +2,11 @@
 
 import { createAuthClient } from "better-auth/react";
 
-const authBaseUrl = process.env.NEXT_PUBLIC_NEON_AUTH_URL;
-
-if (!authBaseUrl) {
-	throw new Error("NEXT_PUBLIC_NEON_AUTH_URL environment variable is required");
-}
+const authBaseUrl =
+  process.env.NEXT_PUBLIC_NEON_AUTH_URL?.trim() || "/api/auth";
 
 export const authClient = createAuthClient({
-	baseURL: authBaseUrl,
+  baseURL: authBaseUrl,
 });
 
 export const { signIn, signOut, signUp, useSession } = authClient;
