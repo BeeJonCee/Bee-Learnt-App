@@ -13,10 +13,18 @@ import SocialLoginButtons from "@/components/auth/SocialLoginButtons";
 import { getDashboardPath } from "@/lib/navigation";
 import { useAuth } from "@/providers/AuthProvider";
 
+function maskEmail(email: string) {
+  const parts = email.split("@");
+  if (parts.length !== 2) return "***";
+  const [local, domain] = parts;
+  if (local.length <= 2) return `***@${domain}`;
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
 export default function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, login, sendEmailOtp } = useAuth();
+  const { user, login } = useAuth();
   const nextPath = useMemo(
     () => searchParams.get("next") ?? "/dashboard",
     [searchParams],
@@ -49,29 +57,24 @@ export default function LoginPageContent() {
     event.preventDefault();
     setError(null);
     setLoading(true);
+    console.info("[auth-ui] login:submit", {
+      email: maskEmail(email),
+      nextPath,
+    });
 
     try {
       await login(email, password);
+      console.info("[auth-ui] login:submit:success", {
+        email: maskEmail(email),
+      });
       // User will be redirected by the useEffect hook above
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Invalid email or password.";
-      if (message.toLowerCase().includes("not verified")) {
-        try {
-          await sendEmailOtp(email);
-          router.replace(
-            `/verify?email=${encodeURIComponent(email)}&next=${encodeURIComponent(nextPath)}&sent=1`,
-          );
-          return;
-        } catch (sendErr) {
-          setError(
-            sendErr instanceof Error
-              ? sendErr.message
-              : "Email not verified. Unable to send verification code.",
-          );
-          return;
-        }
-      }
+      console.error("[auth-ui] login:submit:error", {
+        email: maskEmail(email),
+        message,
+      });
       setError(message);
     } finally {
       setLoading(false);

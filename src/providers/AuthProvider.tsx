@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from "react";
+import { authClient } from "@/lib/auth/client";
 import type { AuthUser } from "@/lib/auth/storage";
 import {
   clearStoredAuth,
@@ -28,9 +29,7 @@ type AuthContextValue = {
     email: string;
     password: string;
     role: "STUDENT" | "PARENT";
-  }) => Promise<void>;
-  sendEmailOtp: (email: string) => Promise<void>;
-  verifyEmailOtp: (email: string, code: string) => Promise<void>;
+  }) => Promise<{ autoLoggedIn: boolean }>;
   socialLogin: (provider: SocialProvider) => void;
   logout: () => void;
 };
@@ -41,6 +40,23 @@ const backendUrl =
   process.env.NEXT_PUBLIC_BACKEND_URL ??
   process.env.NEXT_PUBLIC_API_URL ??
   "http://localhost:4000";
+const AUTH_LOG_NS = "[auth-client]";
+
+function createTraceId(action: "login" | "register") {
+  return `${action}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function maskEmail(email: string) {
+  const parts = email.split("@");
+  if (parts.length !== 2) return "***";
+  const [local, domain] = parts;
+  if (local.length <= 2) return `***@${domain}`;
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unknown error";
+}
 
 async function backendFetch<T>(
   path: string,
@@ -64,6 +80,28 @@ async function backendFetch<T>(
     throw new Error(message);
   }
   return response.json() as Promise<T>;
+}
+
+async function exchangeSessionToken(sessionToken: string, traceId?: string) {
+  const headers = traceId
+    ? {
+        "x-auth-trace-id": traceId,
+      }
+    : undefined;
+
+  return backendFetch<{ token: string; user: AuthUser }>(
+    "/api/auth/exchange-neon-token",
+    {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ sessionToken }),
+    },
+  );
+}
+
+async function resolveSessionTokenFromAuthClient() {
+  const sessionResponse = await authClient.getSession();
+  return sessionResponse.data?.session?.token ?? null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -129,61 +167,143 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Authenticate with Better Auth and exchange for backend JWT.
   const login = useCallback(async (email: string, password: string) => {
-    const result = await backendFetch<{ token: string; user: AuthUser }>(
-      "/api/auth/login",
-      {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      },
-    );
+    const traceId = createTraceId("login");
+    console.info(`${AUTH_LOG_NS} login:start`, {
+      traceId,
+      email: maskEmail(email),
+    });
 
-    setStoredAuth({ token: result.token, user: result.user });
-    setUser(result.user);
-    setToken(result.token);
+    try {
+      const signInResult = await authClient.signIn.email({
+        email,
+        password,
+      });
+
+      if (signInResult.error) {
+        console.error(`${AUTH_LOG_NS} login:sign-in-email:error`, {
+          traceId,
+          message: signInResult.error.message,
+        });
+        throw new Error(signInResult.error.message || "Invalid email or password.");
+      }
+
+      console.info(`${AUTH_LOG_NS} login:sign-in-email:success`, { traceId });
+
+      const sessionToken = await resolveSessionTokenFromAuthClient();
+      if (!sessionToken) {
+        console.error(`${AUTH_LOG_NS} login:get-session:error`, {
+          traceId,
+          message: "No active authentication session found.",
+        });
+        throw new Error("No active authentication session found.");
+      }
+
+      console.info(`${AUTH_LOG_NS} login:get-session:success`, {
+        traceId,
+        sessionTokenLength: sessionToken.length,
+      });
+
+      const result = await exchangeSessionToken(sessionToken, traceId);
+
+      setStoredAuth({ token: result.token, user: result.user });
+      setUser(result.user);
+      setToken(result.token);
+
+      console.info(`${AUTH_LOG_NS} login:exchange:success`, {
+        traceId,
+        userId: result.user.id,
+        role: result.user.role,
+      });
+    } catch (error) {
+      console.error(`${AUTH_LOG_NS} login:error`, {
+        traceId,
+        message: getErrorMessage(error),
+      });
+      throw error;
+    }
   }, []);
 
+  // Register via Better Auth and exchange session when available.
   const register = useCallback(
     async (payload: {
       name: string;
       email: string;
       password: string;
       role: "STUDENT" | "PARENT";
-    }) => {
-      await backendFetch("/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify(payload),
+    }): Promise<{ autoLoggedIn: boolean }> => {
+      const traceId = createTraceId("register");
+      console.info(`${AUTH_LOG_NS} register:start`, {
+        traceId,
+        email: maskEmail(payload.email),
+        role: payload.role,
       });
+
+      const signUpPayload = {
+        name: payload.name,
+        email: payload.email,
+        password: payload.password,
+        role: payload.role,
+      } as Parameters<typeof authClient.signUp.email>[0];
+
+      const signUpResult = await authClient.signUp.email(signUpPayload);
+
+      if (signUpResult.error) {
+        console.error(`${AUTH_LOG_NS} register:sign-up-email:error`, {
+          traceId,
+          message: signUpResult.error.message,
+        });
+        throw new Error(signUpResult.error.message || "Registration failed");
+      }
+
+      console.info(`${AUTH_LOG_NS} register:sign-up-email:success`, { traceId });
+
+      try {
+        const sessionToken = await resolveSessionTokenFromAuthClient();
+        if (!sessionToken) {
+          console.warn(`${AUTH_LOG_NS} register:auto-login:skipped`, {
+            traceId,
+            reason: "No active session token after signup",
+          });
+          return { autoLoggedIn: false };
+        }
+
+        const result = await exchangeSessionToken(sessionToken, traceId);
+
+        setStoredAuth({ token: result.token, user: result.user });
+        setUser(result.user);
+        setToken(result.token);
+
+        console.info(`${AUTH_LOG_NS} register:auto-login:success`, {
+          traceId,
+          userId: result.user.id,
+          role: result.user.role,
+        });
+
+        return { autoLoggedIn: true };
+      } catch (error) {
+        console.error(`${AUTH_LOG_NS} register:auto-login:error`, {
+          traceId,
+          message: getErrorMessage(error),
+        });
+        return { autoLoggedIn: false };
+      }
     },
     [],
   );
 
-  const sendEmailOtp = useCallback(async (email: string) => {
-    await backendFetch("/api/auth/verify/send", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    });
-  }, []);
-
-  const verifyEmailOtp = useCallback(async (email: string, code: string) => {
-    await backendFetch("/api/auth/verify/confirm", {
-      method: "POST",
-      body: JSON.stringify({ email, code }),
-    });
-  }, []);
-
   const logout = useCallback(() => {
+    void authClient.signOut().catch(() => {});
     clearStoredAuth();
     setUser(null);
     setToken(null);
   }, []);
 
   const socialLogin = useCallback((provider: SocialProvider) => {
-    import("@/lib/auth/client").then(({ authClient }) => {
-      authClient.signIn.social({
-        provider,
-        callbackURL: "/social-callback",
-      });
+    void authClient.signIn.social({
+      provider,
+      callbackURL: "/social-callback",
     });
   }, []);
 
@@ -194,22 +314,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loading,
       login,
       register,
-      sendEmailOtp,
-      verifyEmailOtp,
       socialLogin,
       logout,
     }),
-    [
-      user,
-      token,
-      loading,
-      login,
-      register,
-      sendEmailOtp,
-      verifyEmailOtp,
-      socialLogin,
-      logout,
-    ],
+    [user, token, loading, login, register, socialLogin, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

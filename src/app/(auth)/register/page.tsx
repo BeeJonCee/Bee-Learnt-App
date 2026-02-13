@@ -20,9 +20,17 @@ const roleOptions = [
   { value: "PARENT", label: "Parent" },
 ];
 
+function maskEmail(email: string) {
+  const parts = email.split("@");
+  if (parts.length !== 2) return "***";
+  const [local, domain] = parts;
+  if (local.length <= 2) return `***@${domain}`;
+  return `${local.slice(0, 2)}***@${domain}`;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
-  const { register, sendEmailOtp } = useAuth();
+  const { register } = useAuth();
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -38,25 +46,45 @@ export default function RegisterPage() {
     setError(null);
     setSuccess(null);
     setLoading(true);
+    console.info("[auth-ui] register:submit", {
+      email: maskEmail(form.email),
+      role: form.role,
+    });
 
     try {
-      await register({
+      const result = await register({
         name: form.name,
         email: form.email,
         password: form.password,
         role: form.role as "STUDENT" | "PARENT",
       });
 
-      await sendEmailOtp(form.email);
-      setSuccess("Verification code sent. Check your email to finish setup.");
-
-      const nextPath =
-        form.role === "STUDENT" ? "/onboarding" : getDashboardPath(form.role);
-      router.replace(
-        `/verify?email=${encodeURIComponent(form.email)}&next=${encodeURIComponent(nextPath)}&sent=1`,
-      );
+      if (result.autoLoggedIn) {
+        console.info("[auth-ui] register:auto-login:success", {
+          email: maskEmail(form.email),
+          role: form.role,
+        });
+        const targetPath =
+          form.role === "STUDENT" ? "/onboarding" : getDashboardPath(form.role);
+        router.replace(targetPath);
+      } else {
+        console.warn("[auth-ui] register:auto-login:skipped", {
+          email: maskEmail(form.email),
+          role: form.role,
+          reason: "No active session after signup",
+        });
+        setSuccess(
+          "Account created! Check your email for a verification link, then sign in.",
+        );
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed.");
+      const message = err instanceof Error ? err.message : "Registration failed.";
+      console.error("[auth-ui] register:submit:error", {
+        email: maskEmail(form.email),
+        role: form.role,
+        message,
+      });
+      setError(message);
     } finally {
       setLoading(false);
     }

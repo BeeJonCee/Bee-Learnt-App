@@ -24,9 +24,22 @@ export default function CallbackClient() {
 
     const exchangeToken = async () => {
       try {
-        // Direct token exchange - no slow bridge pattern
-        // The route extracts session token from __session cookie and exchanges it
-        const response = await fetch("/api/auth/bridge-session");
+        // Finalize OAuth callback and resolve the active session token.
+        const sessionResponse = await authClient.getSession();
+        const sessionToken = sessionResponse.data?.session?.token;
+
+        if (!sessionToken) {
+          throw new Error("No active authentication session found.");
+        }
+
+        // Bridge Better Auth session token -> backend JWT.
+        const response = await fetch("/api/auth/bridge-session", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ sessionToken }),
+        });
 
         if (!response.ok) {
           const payload = await response.json().catch(() => ({}));
@@ -51,7 +64,7 @@ export default function CallbackClient() {
       }
     };
 
-    exchangeToken();
+    void exchangeToken();
   }, [router]);
 
   if (error) {
