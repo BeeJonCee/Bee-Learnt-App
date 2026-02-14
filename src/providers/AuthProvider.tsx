@@ -12,6 +12,7 @@ import {
 import { authClient } from "@/lib/auth/client";
 import type { AuthUser } from "@/lib/auth/storage";
 import {
+  AUTH_STORAGE_EVENT,
   clearStoredAuth,
   getStoredAuth,
   setStoredAuth,
@@ -316,11 +317,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(next?.user ?? null);
       setToken(next?.token ?? null);
     };
+
+    const onAuthStorageEvent = () => {
+      const next = getStoredAuth();
+      setUser(next?.user ?? null);
+      setToken(next?.token ?? null);
+    };
+
     window.addEventListener("storage", onStorage);
+    window.addEventListener(AUTH_STORAGE_EVENT, onAuthStorageEvent);
 
     return () => {
       active = false;
       window.removeEventListener("storage", onStorage);
+      window.removeEventListener(AUTH_STORAGE_EVENT, onAuthStorageEvent);
     };
   }, []);
 

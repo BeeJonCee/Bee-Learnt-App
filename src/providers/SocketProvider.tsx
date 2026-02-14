@@ -35,17 +35,13 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const socketRef = useRef<Socket | null>(null);
+  const tokenRef = useRef<string | null>(null);
   const { token } = useAuth();
 
-  // Initialize socket connection when token is available
-  useEffect(() => {
-    // Don't connect if already connected or no token
-    if (socketRef.current?.connected) return;
-    if (!token) return;
-
+  const createSocket = useCallback((authToken: string) => {
     const newSocket = io(SOCKET_URL, {
       auth: {
-        token,
+        token: authToken,
       },
       transports: ["websocket", "polling"],
       reconnection: true,
@@ -76,25 +72,51 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     newSocket.on("error", (error) => {
       console.error("[Socket] Error:", error);
     });
+  }, []);
 
-    // Clean up on unmount
+  // Keep socket auth in sync with the current backend JWT.
+  useEffect(() => {
+    if (!token) {
+      tokenRef.current = null;
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
+      }
+      setSocket(null);
+      setIsConnected(false);
+      return;
+    }
+
+    if (!socketRef.current) {
+      createSocket(token);
+      tokenRef.current = token;
+      return;
+    }
+
+    if (tokenRef.current !== token) {
+      socketRef.current.auth = { token };
+      tokenRef.current = token;
+      if (socketRef.current.connected) {
+        socketRef.current.disconnect();
+      }
+      socketRef.current.connect();
+      return;
+    }
+
+    if (!socketRef.current.connected) {
+      socketRef.current.connect();
+    }
+  }, [token, createSocket]);
+
+  // Clean up on unmount
+  useEffect(() => {
     return () => {
-      if (newSocket) {
-        newSocket.disconnect();
+      if (socketRef.current) {
+        socketRef.current.disconnect();
         socketRef.current = null;
       }
     };
-  }, [token]);
-
-  // Update socket auth when token changes
-  useEffect(() => {
-    if (socketRef.current && token) {
-      socketRef.current.auth = { token };
-      if (!socketRef.current.connected) {
-        socketRef.current.connect();
-      }
-    }
-  }, [token]);
+  }, []);
 
   // Join a collaboration room
   const joinRoom = useCallback((roomId: number) => {

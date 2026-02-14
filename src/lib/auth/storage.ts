@@ -11,6 +11,12 @@ export type StoredAuth = {
 };
 
 const STORAGE_KEY = "beelearn-auth";
+export const AUTH_STORAGE_EVENT = "beelearn-auth-updated";
+
+function dispatchAuthStorageEvent() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(AUTH_STORAGE_EVENT));
+}
 
 export function getStoredAuth(): StoredAuth | null {
   if (typeof window === "undefined") return null;
@@ -26,9 +32,11 @@ export function getStoredAuth(): StoredAuth | null {
 export function setStoredAuth(data: StoredAuth) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  dispatchAuthStorageEvent();
 }
 
 export function clearStoredAuth() {
   if (typeof window === "undefined") return;
   window.localStorage.removeItem(STORAGE_KEY);
+  dispatchAuthStorageEvent();
 }

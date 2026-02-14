@@ -82,6 +82,7 @@ export default function ModulePage() {
   const [toastOpen, setToastOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState("AI quiz generated.");
   const [offlineLoading, setOfflineLoading] = useState(false);
+  const canGenerateQuiz = user?.role === "ADMIN" || user?.role === "TUTOR";
 
   if (moduleLoading) {
     return (
@@ -171,36 +172,38 @@ export default function ModulePage() {
           )}
         </Box>
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
-          <Button
-            variant="contained"
-            startIcon={<AutoAwesomeIcon />}
-            onClick={async () => {
-              try {
-                await apiFetch("/api/quizzes/generate", {
-                  method: "POST",
-                  body: JSON.stringify({
-                    subjectId: moduleData.subjectId,
-                    moduleId: moduleData.id,
-                    topic: moduleData.title,
-                    grade: moduleData.grade,
-                    capsTags: moduleData.capsTags ?? [],
-                  }),
-                });
-                await refetchQuizzes();
-                setToastMessage("AI quiz generated. Check the quizzes list.");
-              } catch (error) {
-                setToastMessage(
-                  error instanceof Error
-                    ? error.message
-                    : "Unable to generate quiz.",
-                );
-              } finally {
-                setToastOpen(true);
-              }
-            }}
-          >
-            Generate AI quiz
-          </Button>
+          {canGenerateQuiz && (
+            <Button
+              variant="contained"
+              startIcon={<AutoAwesomeIcon />}
+              onClick={async () => {
+                try {
+                  await apiFetch("/api/quizzes/generate", {
+                    method: "POST",
+                    body: JSON.stringify({
+                      subjectId: moduleData.subjectId,
+                      moduleId: moduleData.id,
+                      topic: moduleData.title,
+                      grade: moduleData.grade,
+                      capsTags: moduleData.capsTags ?? [],
+                    }),
+                  });
+                  await refetchQuizzes();
+                  setToastMessage("AI quiz generated. Check the quizzes list.");
+                } catch (error) {
+                  setToastMessage(
+                    error instanceof Error
+                      ? error.message
+                      : "Unable to generate quiz.",
+                  );
+                } finally {
+                  setToastOpen(true);
+                }
+              }}
+            >
+              Generate AI quiz
+            </Button>
+          )}
           <Button
             variant="outlined"
             startIcon={<CloudDownloadIcon />}

@@ -55,6 +55,19 @@ type NavItem = {
   visible: boolean;
 };
 
+function getDashboardHeader(role?: string) {
+  switch (role) {
+    case "ADMIN":
+      return "Admin Dashboard";
+    case "PARENT":
+      return "Parent Dashboard";
+    case "TUTOR":
+      return "Tutor Dashboard";
+    default:
+      return "Student Dashboard";
+  }
+}
+
 export default function AppShell({ children }: { children: ReactNode }) {
   const { user, logout } = useAuth();
   const pathname = usePathname() ?? "";
@@ -66,6 +79,8 @@ export default function AppShell({ children }: { children: ReactNode }) {
   const effectiveDrawerWidth =
     isDesktop && isCollapsed ? collapsedDrawerWidth : drawerWidth;
   const showLabels = !isDesktop || !isCollapsed;
+  const hideStudentSidebarScrollbar = user?.role === "STUDENT";
+  const dashboardHeader = getDashboardHeader(user?.role);
 
   const navItems = useMemo<NavItem[]>(() => {
     const role = user?.role ?? "STUDENT";
@@ -169,7 +184,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             <Box>
               <Typography variant="h6">BeeLearnt</Typography>
               <Typography variant="caption" color="text.secondary">
-                CAPS-ready learning
+                {dashboardHeader}
               </Typography>
             </Box>
           )}
@@ -286,7 +301,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
             </IconButton>
           )}
           <Typography variant="subtitle1" sx={{ flexGrow: 1 }}>
-            BeeLearnt Workspace
+            {dashboardHeader}
           </Typography>
           <NotificationCenter />
           <IconButton color="inherit" onClick={toggleMode}>
@@ -328,6 +343,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 backgroundImage: "none",
                 backgroundColor: "rgba(15, 17, 22, 0.9)",
                 borderRight: "1px solid rgba(255,255,255,0.06)",
+                overflowX: "hidden",
+                ...(hideStudentSidebarScrollbar
+                  ? {
+                      scrollbarWidth: "none",
+                      msOverflowStyle: "none",
+                      "&::-webkit-scrollbar": {
+                        display: "none",
+                      },
+                    }
+                  : {}),
                 transition: theme.transitions.create("width", {
                   easing: theme.transitions.easing.sharp,
                   duration: theme.transitions.duration.shorter,
@@ -351,6 +376,16 @@ export default function AppShell({ children }: { children: ReactNode }) {
                 backgroundImage: "none",
                 backgroundColor: "rgba(15, 17, 22, 0.98)",
                 borderRight: "1px solid rgba(255,255,255,0.06)",
+                overflowX: "hidden",
+                ...(hideStudentSidebarScrollbar
+                  ? {
+                      scrollbarWidth: "none",
+                      msOverflowStyle: "none",
+                      "&::-webkit-scrollbar": {
+                        display: "none",
+                      },
+                    }
+                  : {}),
               },
             }}
           >
