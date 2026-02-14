@@ -10,13 +10,33 @@ import Card from "@mui/material/Card";
 import CardContent from "@mui/material/CardContent";
 import LinearProgress from "@mui/material/LinearProgress";
 import Stack from "@mui/material/Stack";
-import TextField from "@mui/material/TextField";
 import Typography from "@mui/material/Typography";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useMemo, useState } from "react";
+import QuestionRenderer from "@/components/assessments/QuestionRenderer";
 import { useApi } from "@/hooks/useApi";
 import { apiFetch } from "@/lib/utils/api";
+
+function extractAnswerValue(answer: unknown): unknown {
+  if (!answer || typeof answer !== "object" || Array.isArray(answer))
+    return answer;
+  const payload = answer as Record<string, unknown>;
+  if (payload.value !== undefined) return payload.value;
+  if (payload.answer !== undefined) return payload.answer;
+  return answer;
+}
+
+function hasAnswerValue(answer: unknown): boolean {
+  const value = extractAnswerValue(answer);
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "boolean") return true;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return false;
+}
 
 export default function QuizPage() {
   const params = useParams();
@@ -31,9 +51,9 @@ export default function QuizPage() {
     };
     questions: {
       id: number;
-      type: "multiple_choice" | "short_answer" | "essay";
+      type: string;
       questionText: string;
-      options: string[] | null;
+      options: unknown;
       points: number;
     }[];
   }>(Number.isNaN(id) ? null : `/api/quizzes/${id}`);
@@ -45,7 +65,7 @@ export default function QuizPage() {
   const moduleHref = moduleData ? `/modules/${moduleData.id}` : "/subjects";
 
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [answers, setAnswers] = useState<Record<number, unknown>>({});
   const [result, setResult] = useState<{
     score: number;
     maxScore: number;
@@ -105,7 +125,7 @@ export default function QuizPage() {
       quizId: quiz.id,
       answers: questions.map((question) => ({
         questionId: question.id,
-        answer: (answers[question.id] ?? "").trim(),
+        answer: answers[question.id],
       })),
     };
 
@@ -200,41 +220,23 @@ export default function QuizPage() {
             <Typography variant="subtitle2" color="text.secondary">
               Question {currentQuestion + 1} of {questions.length}
             </Typography>
-            <Typography variant="h5">{question.questionText}</Typography>
-
             <Stack spacing={1.5}>
-              {question.type === "multiple_choice" &&
-                question.options?.map((option) => (
-                  <Button
-                    key={option}
-                    variant={
-                      answers[question.id] === option ? "contained" : "outlined"
-                    }
-                    onClick={() =>
-                      setAnswers((prev) => ({
-                        ...prev,
-                        [question.id]: option,
-                      }))
-                    }
-                  >
-                    {option}
-                  </Button>
-                ))}
-
-              {question.type !== "multiple_choice" && (
-                <TextField
-                  placeholder="Type your answer"
-                  multiline
-                  minRows={3}
-                  value={answers[question.id] ?? ""}
-                  onChange={(event) =>
-                    setAnswers((prev) => ({
-                      ...prev,
-                      [question.id]: event.target.value,
-                    }))
-                  }
-                />
-              )}
+              <QuestionRenderer
+                question={{
+                  assessmentQuestionId: question.id,
+                  type: question.type,
+                  questionText: question.questionText,
+                  options: question.options,
+                  points: question.points,
+                }}
+                answer={answers[question.id]}
+                onChange={(questionId, value) =>
+                  setAnswers((prev) => ({
+                    ...prev,
+                    [questionId]: value,
+                  }))
+                }
+              />
             </Stack>
 
             {feedback && (
@@ -254,7 +256,7 @@ export default function QuizPage() {
                 <Button
                   variant="outlined"
                   onClick={async () => {
-                    if (!answers[question.id]) return;
+                    if (!hasAnswerValue(answers[question.id])) return;
                     setCheckingQuestionId(question.id);
                     try {
                       const response = await apiFetch<{
@@ -278,7 +280,8 @@ export default function QuizPage() {
                     }
                   }}
                   disabled={
-                    !answers[question.id] || checkingQuestionId === question.id
+                    !hasAnswerValue(answers[question.id]) ||
+                    checkingQuestionId === question.id
                   }
                 >
                   {checkingQuestionId === question.id
@@ -289,7 +292,7 @@ export default function QuizPage() {
                   variant="contained"
                   endIcon={<ArrowForwardIcon />}
                   onClick={handleNext}
-                  disabled={!answers[question.id]}
+                  disabled={!hasAnswerValue(answers[question.id])}
                 >
                   {currentQuestion === questions.length - 1
                     ? "Submit quiz"

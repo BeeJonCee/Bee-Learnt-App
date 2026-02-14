@@ -16,6 +16,26 @@ import QuestionRenderer from "@/components/assessments/QuestionRenderer";
 import { useTimer } from "@/hooks/useTimer";
 import { apiFetch } from "@/lib/utils/api";
 
+function extractAnswerValue(answer: unknown): unknown {
+  if (!answer || typeof answer !== "object" || Array.isArray(answer))
+    return answer;
+  const payload = answer as Record<string, unknown>;
+  if (payload.value !== undefined) return payload.value;
+  if (payload.answer !== undefined) return payload.answer;
+  return answer;
+}
+
+function hasAnswerValue(answer: unknown): boolean {
+  const value = extractAnswerValue(answer);
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "boolean") return true;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return false;
+}
+
 type StartAttemptPayload = {
   attemptId: string;
   assessment: {
@@ -222,7 +242,9 @@ export default function TakeAssessmentPage() {
     );
   }
 
-  const answeredCount = Object.keys(answers).length;
+  const answeredCount = Object.values(answers).filter((value) =>
+    hasAnswerValue(value),
+  ).length;
 
   return (
     <Stack spacing={2.5}>
@@ -289,7 +311,7 @@ export default function TakeAssessmentPage() {
             color={
               i === currentIndex
                 ? "primary"
-                : answers[q.assessmentQuestionId] !== undefined
+                : hasAnswerValue(answers[q.assessmentQuestionId])
                   ? "success"
                   : "default"
             }

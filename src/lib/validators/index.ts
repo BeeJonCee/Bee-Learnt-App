@@ -76,19 +76,36 @@ export const quizGenerateSchema = z.object({
     .optional(),
 });
 
+const nonEmptyAnswerValue = z.unknown().refine((value) => {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.trim().length > 0;
+  if (typeof value === "number") return Number.isFinite(value);
+  if (typeof value === "boolean") return true;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") {
+    const payload = value as Record<string, unknown>;
+    if (payload.value === undefined) return Object.keys(payload).length > 0;
+    if (typeof payload.value === "string")
+      return payload.value.trim().length > 0;
+    if (Array.isArray(payload.value)) return payload.value.length > 0;
+    return payload.value !== null && payload.value !== undefined;
+  }
+  return false;
+}, "Answer is required");
+
 export const quizSubmitSchema = z.object({
   quizId: z.number().int().positive(),
   answers: z.array(
     z.object({
       questionId: z.number().int().positive(),
-      answer: z.string().min(1),
+      answer: nonEmptyAnswerValue,
     }),
   ),
 });
 
 export const quizCheckSchema = z.object({
   questionId: z.number().int().positive(),
-  answer: z.string().min(1),
+  answer: nonEmptyAnswerValue,
 });
 
 export const studySessionCreateSchema = z.object({
